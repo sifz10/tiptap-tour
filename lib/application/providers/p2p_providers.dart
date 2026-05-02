@@ -5,29 +5,30 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:tiptap_tour/application/providers/database_provider.dart';
 import 'package:tiptap_tour/domain/entities/p2p_peer.dart';
 import 'package:tiptap_tour/domain/enums/connection_state.dart';
-import 'package:tiptap_tour/infrastructure/p2p/p2p_service.dart';
+import 'package:tiptap_tour/infrastructure/p2p/transport.dart';
+import 'package:tiptap_tour/infrastructure/p2p/wifi_transport.dart';
 import 'package:tiptap_tour/infrastructure/sync/sync_engine.dart';
 
-final p2pServiceProvider = Provider<P2PService>((ref) {
+final p2pServiceProvider = Provider<P2PTransport>((ref) {
   final settingsBox = Hive.box('settings');
   final userId = settingsBox.get('userId', defaultValue: 'unknown') as String;
   final displayName =
       settingsBox.get('displayName', defaultValue: 'Unknown') as String;
 
-  final service = P2PService(deviceId: userId, displayName: displayName);
+  final service = WifiTransport(deviceId: userId, displayName: displayName);
   ref.onDispose(() => service.dispose());
   return service;
 });
 
 final syncEngineProvider = Provider<SyncEngine>((ref) {
   final db = ref.watch(databaseProvider);
-  final p2pService = ref.watch(p2pServiceProvider);
+  final transport = ref.watch(p2pServiceProvider);
   final settingsBox = Hive.box('settings');
   final userId = settingsBox.get('userId', defaultValue: 'unknown') as String;
 
   final engine = SyncEngine(
     db: db,
-    p2pService: p2pService,
+    p2pService: transport,
     localDeviceId: userId,
   );
   engine.start();
@@ -37,18 +38,18 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
 
 final p2pConnectionStateProvider =
     StreamProvider<P2PConnectionState>((ref) {
-  final service = ref.watch(p2pServiceProvider);
-  return service.connectionState;
+  final transport = ref.watch(p2pServiceProvider);
+  return transport.connectionState;
 });
 
 final discoveredPeersProvider = StreamProvider<List<P2PPeer>>((ref) {
-  final service = ref.watch(p2pServiceProvider);
-  return service.discoveredPeers;
+  final transport = ref.watch(p2pServiceProvider);
+  return transport.discoveredPeers;
 });
 
 final connectedPeersProvider = StreamProvider<List<P2PPeer>>((ref) {
-  final service = ref.watch(p2pServiceProvider);
-  return service.connectedPeers;
+  final transport = ref.watch(p2pServiceProvider);
+  return transport.connectedPeers;
 });
 
 final syncProgressProvider = StreamProvider<SyncProgress>((ref) {
@@ -57,7 +58,7 @@ final syncProgressProvider = StreamProvider<SyncProgress>((ref) {
 });
 
 class P2PController extends StateNotifier<P2PControllerState> {
-  final P2PService _service;
+  final P2PTransport _service;
   final SyncEngine _syncEngine;
 
   P2PController(this._service, this._syncEngine)

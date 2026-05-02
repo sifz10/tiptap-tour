@@ -5,7 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:tiptap_tour/core/utils/hlc.dart';
 import 'package:tiptap_tour/infrastructure/database/app_database.dart';
 import 'package:tiptap_tour/infrastructure/p2p/p2p_message.dart';
-import 'package:tiptap_tour/infrastructure/p2p/p2p_service.dart';
+import 'package:tiptap_tour/infrastructure/p2p/transport.dart';
 
 class SyncProgress {
   final String peerDeviceId;
@@ -28,7 +28,7 @@ class SyncProgress {
 
 class SyncEngine {
   final AppDatabase db;
-  final P2PService p2pService;
+  final P2PTransport p2pService;
   final String localDeviceId;
 
   SyncEngine({

@@ -66,8 +66,34 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          SliverAppBar.large(
-            title: const Text('Nearby'),
+          SliverAppBar(
+            title: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withAlpha(25),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.radar_rounded,
+                    color: AppColors.secondary,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Nearby',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            pinned: true,
+            backgroundColor:
+                Theme.of(context).scaffoldBackgroundColor.withAlpha(230),
             actions: [
               if (connectedPeers.isNotEmpty)
                 Padding(

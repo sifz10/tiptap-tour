@@ -100,29 +100,49 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   SliverAppBar _buildAppBar(BuildContext context, Brightness brightness) {
-    return SliverAppBar.large(
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return SliverAppBar(
+      title: Row(
         children: [
-          Text(
-            'Settings',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withAlpha(25),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.settings_rounded,
+              color: AppColors.primary,
+              size: 18,
+            ),
           ),
-          Text(
-            'Customize your experience',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: 0.6),
-                ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Settings',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              Text(
+                'Customize your experience',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.6),
+                      fontSize: 11,
+                    ),
+              ),
+            ],
           ),
         ],
       ),
-      floating: true,
-      backgroundColor: Colors.transparent,
+      pinned: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor.withAlpha(230),
       flexibleSpace: ClipRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
