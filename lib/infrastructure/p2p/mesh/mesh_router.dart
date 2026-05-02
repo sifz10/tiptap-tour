@@ -4,6 +4,7 @@ import 'package:tiptap_tour/domain/entities/p2p_peer.dart';
 import 'package:tiptap_tour/domain/enums/connection_state.dart';
 import 'package:tiptap_tour/infrastructure/p2p/mesh/routing_table.dart';
 import 'package:tiptap_tour/infrastructure/p2p/mesh/seen_message_cache.dart';
+import 'package:tiptap_tour/infrastructure/p2p/p2p_diagnostics.dart';
 import 'package:tiptap_tour/infrastructure/p2p/p2p_message.dart';
 import 'package:tiptap_tour/infrastructure/p2p/transport.dart';
 
@@ -58,6 +59,49 @@ class MeshRouter implements P2PTransport {
 
   @override
   Stream<P2PMessage> get incomingMessages => _incomingController.stream;
+
+  List<P2PPeerDiagnostic> get peerDiagnostics {
+    final directPeers = _transport.currentConnectedPeers;
+    final directIds = directPeers.map((peer) => peer.deviceId).toSet();
+    final diagnostics = <P2PPeerDiagnostic>[
+      for (final peer in directPeers)
+        P2PPeerDiagnostic(
+          deviceId: peer.deviceId,
+          displayName: peer.displayName,
+          isDirect: true,
+          hopCount: 1,
+          nextHopId: peer.deviceId,
+          transportLabel: peer.platform ?? 'Direct',
+          encryptionReady: false,
+          lastUpdated: peer.lastSeen,
+        ),
+    ];
+
+    for (final entry in _routedPeers.entries) {
+      if (directIds.contains(entry.key)) continue;
+      final route = _routingTable.getEntry(entry.key);
+      if (route == null) continue;
+      diagnostics.add(
+        P2PPeerDiagnostic(
+          deviceId: entry.key,
+          displayName: entry.value.displayName,
+          isDirect: false,
+          hopCount: route.hopCount,
+          nextHopId: route.nextHopId,
+          transportLabel: 'Mesh',
+          encryptionReady: false,
+          lastUpdated: route.lastUpdated,
+        ),
+      );
+    }
+
+    diagnostics.sort((a, b) {
+      final hopCompare = a.hopCount.compareTo(b.hopCount);
+      if (hopCompare != 0) return hopCompare;
+      return a.displayName.compareTo(b.displayName);
+    });
+    return diagnostics;
+  }
 
   void start() {
     _messageSubscription = _transport.incomingMessages.listen(_onMessage);

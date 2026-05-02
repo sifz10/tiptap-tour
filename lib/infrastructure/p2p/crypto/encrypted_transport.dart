@@ -76,6 +76,11 @@ class EncryptedTransport implements P2PTransport {
   @override
   Stream<P2PMessage> get incomingMessages => _incomingController.stream;
 
+  Set<String> get encryptedPeerIds => Set.unmodifiable(_sharedKeys.keys);
+
+  bool hasEncryptionFor(String peerDeviceId) =>
+      _sharedKeys.containsKey(peerDeviceId);
+
   @override
   Future<void> startServer() async {
     await _identity;

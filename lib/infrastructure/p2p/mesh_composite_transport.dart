@@ -4,6 +4,7 @@ import 'package:tiptap_tour/domain/enums/transport_type.dart';
 import 'package:tiptap_tour/infrastructure/p2p/composite_transport.dart';
 import 'package:tiptap_tour/infrastructure/p2p/crypto/encrypted_transport.dart';
 import 'package:tiptap_tour/infrastructure/p2p/mesh/mesh_router.dart';
+import 'package:tiptap_tour/infrastructure/p2p/p2p_diagnostics.dart';
 import 'package:tiptap_tour/infrastructure/p2p/p2p_message.dart';
 import 'package:tiptap_tour/infrastructure/p2p/transport.dart';
 
@@ -31,6 +32,24 @@ class MeshCompositeTransport implements P2PTransport {
   bool get bleEnabled => _composite.bleEnabled;
   Map<String, TransportType> get peerTransportMap =>
       _composite.peerTransportMap;
+
+  P2PDiagnostics get diagnostics {
+    final transportMap = _composite.peerTransportMap;
+    final encryptedPeerIds = _encryptedTransport.encryptedPeerIds;
+    return P2PDiagnostics(
+      wifiEnabled: wifiEnabled,
+      bleEnabled: bleEnabled,
+      peers: [
+        for (final peer in _meshRouter.peerDiagnostics)
+          peer.copyWith(
+            encryptionReady: encryptedPeerIds.contains(peer.deviceId),
+            transportLabel: peer.isDirect
+                ? transportMap[peer.deviceId]?.label ?? peer.transportLabel
+                : peer.transportLabel,
+          ),
+      ],
+    );
+  }
 
   void setWifiEnabled(bool enabled) => _composite.setWifiEnabled(enabled);
   void setBleEnabled(bool enabled) => _composite.setBleEnabled(enabled);

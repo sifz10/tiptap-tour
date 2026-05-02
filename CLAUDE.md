@@ -163,6 +163,7 @@ Implementations currently present:
 - `CompositeTransport` — merges Wi-Fi and BLE into one physical transport.
 - `MeshRouter` — wraps any `P2PTransport` and adds relay/routing behavior.
 - `EncryptedTransport` — wraps mesh and encrypts chat/sync payloads.
+- `P2PDiagnostics` — reports direct/mesh peers, hop count, next hop, transport label, and encryption readiness for testing.
 - `MeshCompositeTransport` — current app-facing transport combining CompositeTransport + MeshRouter + EncryptedTransport.
 
 ### Wi-Fi Transport
@@ -265,6 +266,7 @@ What is already implemented there:
 - TTL-based loop prevention.
 - Seen-message deduplication.
 - Route expiry and next-hop tracking.
+- Diagnostics for direct vs mesh routes, hop counts, next hops, and peer metadata.
 
 Current live behavior:
 - `MeshRouter` is active through `MeshCompositeTransport`.
@@ -275,7 +277,7 @@ Current live behavior:
 What is **not** done yet:
 - No store-and-forward queue for temporarily unreachable peers.
 - No full real-device validation with 3+ devices.
-- Route debugging UI is minimal; Nearby shows mesh-reachable peers but does not yet show full route tables.
+- Route debugging UI is available as a compact Nearby Network Status panel, but not as a full route-table inspector.
 - No fingerprint verification UI, key rotation, or encrypted backup/recovery yet.
 
 ## BLE / Mesh Roadmap
@@ -287,12 +289,12 @@ Transport modernization phases:
 - Phase 4: composite Wi-Fi + BLE transport — complete.
 - Phase 5: wire `MeshRouter` as the active transport — complete at code level.
 - Phase 6: end-to-end encryption — complete at code level.
-- Phase 7: energy tuning, background behavior, hardening, real-device validation — pending.
+- Phase 7: diagnostics/observability started; energy tuning, background behavior, hardening, real-device validation — pending.
 
 Recommended next implementation order:
 1. Verify direct sync/chat still works on two physical devices through `MeshCompositeTransport`.
 2. Test with at least 3 physical devices in a relay chain.
-3. Add route visibility/debugging on Nearby screen if testing needs more observability.
+3. Use the Nearby Network Status panel during field tests to observe direct peers, mesh peers, encryption readiness, hop count, and next hop.
 4. Add fingerprint/trust UI for encryption identity verification.
 5. Tune scan/advertise intervals for battery life.
 
@@ -317,6 +319,7 @@ Top-level screens already polished:
 Nearby screen specifics:
 - It is the control surface for discovery and peer connections.
 - It now includes Wi-Fi and Bluetooth toggle chips backed by `p2pControllerProvider`.
+- It includes a Network Status panel for Phase 7 field testing: direct peers, mesh peers, encrypted peers, route hop count, next hop, and transport state.
 
 Summary screen specifics:
 - Uses `summaryDataProvider`.

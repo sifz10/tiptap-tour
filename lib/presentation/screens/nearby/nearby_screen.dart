@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tiptap_tour/application/providers/p2p_providers.dart';
+import 'package:tiptap_tour/infrastructure/p2p/p2p_diagnostics.dart';
 import 'package:tiptap_tour/presentation/theme/app_animations.dart';
 import 'package:tiptap_tour/presentation/theme/app_colors.dart';
 import 'package:tiptap_tour/presentation/theme/glass_theme.dart';
@@ -46,6 +47,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
   @override
   Widget build(BuildContext context) {
     final controllerState = ref.watch(p2pControllerProvider);
+    final diagnostics = ref.watch(p2pDiagnosticsProvider);
     final discoveredAsync = ref.watch(discoveredPeersProvider);
     final connectedAsync = ref.watch(connectedPeersProvider);
 
@@ -57,8 +59,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
       _pulseController.stop();
     }
 
-    final connectedPeers =
-        connectedAsync.valueOrNull ?? [];
+    final connectedPeers = connectedAsync.valueOrNull ?? [];
     final discoveredPeers = (discoveredAsync.valueOrNull ?? [])
         .where((p) => !connectedPeers.any((c) => c.deviceId == p.deviceId))
         .toList();
@@ -86,14 +87,15 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                 Text(
                   'Nearby',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ],
             ),
             pinned: true,
-            backgroundColor:
-                Theme.of(context).scaffoldBackgroundColor.withAlpha(230),
+            backgroundColor: Theme.of(
+              context,
+            ).scaffoldBackgroundColor.withAlpha(230),
             actions: [
               if (connectedPeers.isNotEmpty)
                 Padding(
@@ -101,8 +103,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                   child: Chip(
                     avatar: const Icon(Icons.link_rounded, size: 16),
                     label: Text('${connectedPeers.length} connected'),
-                    backgroundColor:
-                        AppColors.success.withAlpha(25),
+                    backgroundColor: AppColors.success.withAlpha(25),
                     side: BorderSide.none,
                   ),
                 ),
@@ -115,6 +116,12 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                 children: [
                   const SizedBox(height: 8),
                   _buildTransportToggles(controllerState),
+                  if (controllerState.isScanning ||
+                      connectedPeers.isNotEmpty ||
+                      diagnostics.peers.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildNetworkDiagnostics(diagnostics),
+                  ],
                   const SizedBox(height: 16),
                   _buildRadarSection(controllerState),
                   const SizedBox(height: 24),
@@ -135,9 +142,9 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                 child: Text(
                   'Connected',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.success,
-                      ),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.success,
+                  ),
                 ),
               ),
             ),
@@ -150,8 +157,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                   final peer = connectedPeers[index];
                   return PeerCard(
                     peer: peer,
-                    isSyncing:
-                        controllerState.syncingWith == peer.deviceId,
+                    isSyncing: controllerState.syncingWith == peer.deviceId,
                     onSync: () => ref
                         .read(p2pControllerProvider.notifier)
                         .syncWithPeer(peer.deviceId),
@@ -170,9 +176,9 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                 padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
                 child: Text(
                   'Discovered Devices',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -185,8 +191,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                   final peer = discoveredPeers[index];
                   return PeerCard(
                     peer: peer,
-                    isConnecting:
-                        controllerState.connectingTo == peer.deviceId,
+                    isConnecting: controllerState.connectingTo == peer.deviceId,
                     onConnect: () => ref
                         .read(p2pControllerProvider.notifier)
                         .connectToPeer(peer),
@@ -218,14 +223,17 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
-          Icon(Icons.settings_input_antenna_rounded,
-              size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.settings_input_antenna_rounded,
+            size: 16,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 8),
           Text(
             'Transport',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const Spacer(),
           _TransportChip(
@@ -247,32 +255,104 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
           ),
         ],
       ),
-    )
-        .animate()
-        .fadeIn(duration: AppAnimations.normal);
+    ).animate().fadeIn(duration: AppAnimations.normal);
+  }
+
+  Widget _buildNetworkDiagnostics(P2PDiagnostics diagnostics) {
+    return GlassCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.hub_rounded,
+                size: 18,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Network Status',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              _StatusPill(
+                icon: Icons.security_rounded,
+                label: '${diagnostics.encryptedPeerCount}',
+                color: AppColors.success,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatusPill(
+                icon: Icons.link_rounded,
+                label: '${diagnostics.directPeerCount} direct',
+                color: AppColors.secondary,
+              ),
+              _StatusPill(
+                icon: Icons.route_rounded,
+                label: '${diagnostics.meshPeerCount} mesh',
+                color: AppColors.info,
+              ),
+              _StatusPill(
+                icon: diagnostics.wifiEnabled
+                    ? Icons.wifi_rounded
+                    : Icons.wifi_off_rounded,
+                label: diagnostics.wifiEnabled ? 'Wi-Fi on' : 'Wi-Fi off',
+                color: diagnostics.wifiEnabled
+                    ? AppColors.success
+                    : AppColors.warning,
+              ),
+              _StatusPill(
+                icon: Icons.bluetooth_rounded,
+                label: diagnostics.bleEnabled ? 'BLE on' : 'BLE off',
+                color: diagnostics.bleEnabled
+                    ? AppColors.success
+                    : AppColors.warning,
+              ),
+            ],
+          ),
+          if (diagnostics.peers.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            for (final peer in diagnostics.peers.take(4)) ...[
+              _RouteDiagnosticRow(peer: peer),
+              if (peer != diagnostics.peers.take(4).last)
+                const SizedBox(height: 8),
+            ],
+          ],
+        ],
+      ),
+    ).animate().fadeIn(duration: AppAnimations.normal);
   }
 
   Widget _buildRadarSection(P2PControllerState controllerState) {
     return SizedBox(
-      height: 200,
-      child: Center(
-        child: AnimatedBuilder(
-          animation: _radarController,
-          builder: (context, child) {
-            return CustomPaint(
-              size: const Size(200, 200),
-              painter: _RadarPainter(
-                progress: _radarController.value,
-                isActive: controllerState.isScanning,
-                pulseValue: _pulseController.value,
-                color: AppColors.primary,
-                brightness: Theme.of(context).brightness,
-              ),
-            );
-          },
-        ),
-      ),
-    )
+          height: 200,
+          child: Center(
+            child: AnimatedBuilder(
+              animation: _radarController,
+              builder: (context, child) {
+                return CustomPaint(
+                  size: const Size(200, 200),
+                  painter: _RadarPainter(
+                    progress: _radarController.value,
+                    isActive: controllerState.isScanning,
+                    pulseValue: _pulseController.value,
+                    color: AppColors.primary,
+                    brightness: Theme.of(context).brightness,
+                  ),
+                );
+              },
+            ),
+          ),
+        )
         .animate()
         .fadeIn(duration: AppAnimations.slow)
         .scale(
@@ -316,9 +396,9 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
               ),
             ),
     ).animate().fadeIn(
-          duration: AppAnimations.normal,
-          delay: const Duration(milliseconds: 200),
-        );
+      duration: AppAnimations.normal,
+      delay: const Duration(milliseconds: 200),
+    );
   }
 
   Widget _buildErrorBanner(String error) {
@@ -326,15 +406,18 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded,
-              color: AppColors.error, size: 20),
+          const Icon(
+            Icons.error_outline_rounded,
+            color: AppColors.error,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               error,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.error,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.error),
             ),
           ),
           IconButton(
@@ -402,10 +485,7 @@ class _RadarPainter extends CustomPainter {
         ..shader = SweepGradient(
           startAngle: sweepAngle - 0.8,
           endAngle: sweepAngle,
-          colors: [
-            color.withAlpha(0),
-            color.withAlpha(60),
-          ],
+          colors: [color.withAlpha(0), color.withAlpha(60)],
           stops: const [0.0, 1.0],
           transform: GradientRotation(sweepAngle - 0.8),
         ).createShader(Rect.fromCircle(center: center, radius: maxRadius));
@@ -453,6 +533,112 @@ class _RadarPainter extends CustomPainter {
       pulseValue != oldDelegate.pulseValue;
 }
 
+class _StatusPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _StatusPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withAlpha(22),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withAlpha(55)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RouteDiagnosticRow extends StatelessWidget {
+  final P2PPeerDiagnostic peer;
+
+  const _RouteDiagnosticRow({required this.peer});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final routeColor = peer.isDirect ? AppColors.secondary : AppColors.info;
+
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: routeColor.withAlpha(22),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            peer.isDirect ? Icons.link_rounded : Icons.route_rounded,
+            size: 15,
+            color: routeColor,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                peer.displayName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                peer.isDirect
+                    ? '${peer.transportLabel} · direct'
+                    : '${peer.hopCount} hops · via ${_shortId(peer.nextHopId)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Icon(
+          peer.encryptionReady ? Icons.lock_rounded : Icons.lock_open_rounded,
+          size: 16,
+          color: peer.encryptionReady ? AppColors.success : AppColors.warning,
+        ),
+      ],
+    );
+  }
+
+  String _shortId(String value) {
+    if (value.length <= 8) return value;
+    return value.substring(0, 8);
+  }
+}
+
 class _TransportChip extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -481,7 +667,9 @@ class _TransportChip extends StatelessWidget {
           color: enabled ? AppColors.primary.withAlpha(20) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: enabled ? AppColors.primary.withAlpha(60) : color.withAlpha(40),
+            color: enabled
+                ? AppColors.primary.withAlpha(60)
+                : color.withAlpha(40),
           ),
         ),
         child: Row(
@@ -492,9 +680,9 @@ class _TransportChip extends StatelessWidget {
             Text(
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: color,
-                    fontWeight: enabled ? FontWeight.w600 : FontWeight.normal,
-                  ),
+                color: color,
+                fontWeight: enabled ? FontWeight.w600 : FontWeight.normal,
+              ),
             ),
           ],
         ),

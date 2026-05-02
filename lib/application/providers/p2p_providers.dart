@@ -6,6 +6,7 @@ import 'package:tiptap_tour/application/providers/database_provider.dart';
 import 'package:tiptap_tour/domain/entities/p2p_peer.dart';
 import 'package:tiptap_tour/domain/enums/connection_state.dart';
 import 'package:tiptap_tour/infrastructure/p2p/mesh_composite_transport.dart';
+import 'package:tiptap_tour/infrastructure/p2p/p2p_diagnostics.dart';
 import 'package:tiptap_tour/infrastructure/sync/sync_engine.dart';
 
 final p2pServiceProvider = Provider<MeshCompositeTransport>((ref) {
@@ -57,6 +58,14 @@ final discoveredPeersProvider = StreamProvider<List<P2PPeer>>((ref) {
 final connectedPeersProvider = StreamProvider<List<P2PPeer>>((ref) {
   final transport = ref.watch(p2pServiceProvider);
   return transport.connectedPeers;
+});
+
+final p2pDiagnosticsProvider = Provider<P2PDiagnostics>((ref) {
+  final transport = ref.watch(p2pServiceProvider);
+  ref.watch(connectedPeersProvider);
+  ref.watch(discoveredPeersProvider);
+  ref.watch(p2pControllerProvider);
+  return transport.diagnostics;
 });
 
 final syncProgressProvider = StreamProvider<SyncProgress>((ref) {
