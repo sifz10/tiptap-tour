@@ -114,6 +114,8 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
               child: Column(
                 children: [
                   const SizedBox(height: 8),
+                  _buildTransportToggles(controllerState),
+                  const SizedBox(height: 16),
                   _buildRadarSection(controllerState),
                   const SizedBox(height: 24),
                   _buildScanButton(controllerState),
@@ -209,6 +211,45 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildTransportToggles(P2PControllerState controllerState) {
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Icon(Icons.settings_input_antenna_rounded,
+              size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Text(
+            'Transport',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const Spacer(),
+          _TransportChip(
+            label: 'Wi-Fi',
+            icon: Icons.wifi_rounded,
+            enabled: controllerState.wifiEnabled,
+            onTap: () => ref
+                .read(p2pControllerProvider.notifier)
+                .setWifiEnabled(!controllerState.wifiEnabled),
+          ),
+          const SizedBox(width: 8),
+          _TransportChip(
+            label: 'BLE',
+            icon: Icons.bluetooth_rounded,
+            enabled: controllerState.bleEnabled,
+            onTap: () => ref
+                .read(p2pControllerProvider.notifier)
+                .setBleEnabled(!controllerState.bleEnabled),
+          ),
+        ],
+      ),
+    )
+        .animate()
+        .fadeIn(duration: AppAnimations.normal);
   }
 
   Widget _buildRadarSection(P2PControllerState controllerState) {
@@ -410,4 +451,54 @@ class _RadarPainter extends CustomPainter {
       progress != oldDelegate.progress ||
       isActive != oldDelegate.isActive ||
       pulseValue != oldDelegate.pulseValue;
+}
+
+class _TransportChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _TransportChip({
+    required this.label,
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = enabled
+        ? AppColors.primary
+        : Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(100);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: enabled ? AppColors.primary.withAlpha(20) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: enabled ? AppColors.primary.withAlpha(60) : color.withAlpha(40),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: color,
+                    fontWeight: enabled ? FontWeight.w600 : FontWeight.normal,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -5,17 +5,25 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:tiptap_tour/application/providers/database_provider.dart';
 import 'package:tiptap_tour/domain/entities/p2p_peer.dart';
 import 'package:tiptap_tour/domain/enums/connection_state.dart';
-import 'package:tiptap_tour/infrastructure/p2p/transport.dart';
-import 'package:tiptap_tour/infrastructure/p2p/wifi_transport.dart';
+import 'package:tiptap_tour/infrastructure/p2p/composite_transport.dart';
 import 'package:tiptap_tour/infrastructure/sync/sync_engine.dart';
 
-final p2pServiceProvider = Provider<P2PTransport>((ref) {
+final p2pServiceProvider = Provider<CompositeTransport>((ref) {
   final settingsBox = Hive.box('settings');
   final userId = settingsBox.get('userId', defaultValue: 'unknown') as String;
   final displayName =
       settingsBox.get('displayName', defaultValue: 'Unknown') as String;
+  final wifiEnabled =
+      settingsBox.get('p2pWifiEnabled', defaultValue: true) as bool;
+  final bleEnabled =
+      settingsBox.get('p2pBleEnabled', defaultValue: true) as bool;
 
-  final service = WifiTransport(deviceId: userId, displayName: displayName);
+  final service = CompositeTransport(
+    deviceId: userId,
+    displayName: displayName,
+    enableWifi: wifiEnabled,
+    enableBle: bleEnabled,
+  );
   ref.onDispose(() => service.dispose());
   return service;
 });
@@ -58,11 +66,14 @@ final syncProgressProvider = StreamProvider<SyncProgress>((ref) {
 });
 
 class P2PController extends StateNotifier<P2PControllerState> {
-  final P2PTransport _service;
+  final CompositeTransport _service;
   final SyncEngine _syncEngine;
 
   P2PController(this._service, this._syncEngine)
-      : super(const P2PControllerState());
+      : super(P2PControllerState(
+          wifiEnabled: _service.wifiEnabled,
+          bleEnabled: _service.bleEnabled,
+        ));
 
   Future<void> startDiscovery() async {
     state = state.copyWith(isScanning: true, error: null);
@@ -102,6 +113,18 @@ class P2PController extends StateNotifier<P2PControllerState> {
     }
   }
 
+  void setWifiEnabled(bool enabled) {
+    _service.setWifiEnabled(enabled);
+    Hive.box('settings').put('p2pWifiEnabled', enabled);
+    state = state.copyWith(wifiEnabled: enabled);
+  }
+
+  void setBleEnabled(bool enabled) {
+    _service.setBleEnabled(enabled);
+    Hive.box('settings').put('p2pBleEnabled', enabled);
+    state = state.copyWith(bleEnabled: enabled);
+  }
+
   void clearError() {
     state = state.copyWith(error: null);
   }
@@ -112,12 +135,16 @@ class P2PControllerState {
   final String? connectingTo;
   final String? syncingWith;
   final String? error;
+  final bool wifiEnabled;
+  final bool bleEnabled;
 
   const P2PControllerState({
     this.isScanning = false,
     this.connectingTo,
     this.syncingWith,
     this.error,
+    this.wifiEnabled = true,
+    this.bleEnabled = true,
   });
 
   P2PControllerState copyWith({
@@ -125,12 +152,16 @@ class P2PControllerState {
     String? connectingTo,
     String? syncingWith,
     String? error,
+    bool? wifiEnabled,
+    bool? bleEnabled,
   }) {
     return P2PControllerState(
       isScanning: isScanning ?? this.isScanning,
       connectingTo: connectingTo,
       syncingWith: syncingWith,
       error: error,
+      wifiEnabled: wifiEnabled ?? this.wifiEnabled,
+      bleEnabled: bleEnabled ?? this.bleEnabled,
     );
   }
 }
