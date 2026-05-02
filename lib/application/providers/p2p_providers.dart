@@ -5,10 +5,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:tiptap_tour/application/providers/database_provider.dart';
 import 'package:tiptap_tour/domain/entities/p2p_peer.dart';
 import 'package:tiptap_tour/domain/enums/connection_state.dart';
-import 'package:tiptap_tour/infrastructure/p2p/composite_transport.dart';
+import 'package:tiptap_tour/infrastructure/p2p/mesh_composite_transport.dart';
 import 'package:tiptap_tour/infrastructure/sync/sync_engine.dart';
 
-final p2pServiceProvider = Provider<CompositeTransport>((ref) {
+final p2pServiceProvider = Provider<MeshCompositeTransport>((ref) {
   final settingsBox = Hive.box('settings');
   final userId = settingsBox.get('userId', defaultValue: 'unknown') as String;
   final displayName =
@@ -18,7 +18,7 @@ final p2pServiceProvider = Provider<CompositeTransport>((ref) {
   final bleEnabled =
       settingsBox.get('p2pBleEnabled', defaultValue: true) as bool;
 
-  final service = CompositeTransport(
+  final service = MeshCompositeTransport(
     deviceId: userId,
     displayName: displayName,
     enableWifi: wifiEnabled,
@@ -44,8 +44,7 @@ final syncEngineProvider = Provider<SyncEngine>((ref) {
   return engine;
 });
 
-final p2pConnectionStateProvider =
-    StreamProvider<P2PConnectionState>((ref) {
+final p2pConnectionStateProvider = StreamProvider<P2PConnectionState>((ref) {
   final transport = ref.watch(p2pServiceProvider);
   return transport.connectionState;
 });
@@ -66,14 +65,16 @@ final syncProgressProvider = StreamProvider<SyncProgress>((ref) {
 });
 
 class P2PController extends StateNotifier<P2PControllerState> {
-  final CompositeTransport _service;
+  final MeshCompositeTransport _service;
   final SyncEngine _syncEngine;
 
   P2PController(this._service, this._syncEngine)
-      : super(P2PControllerState(
+    : super(
+        P2PControllerState(
           wifiEnabled: _service.wifiEnabled,
           bleEnabled: _service.bleEnabled,
-        ));
+        ),
+      );
 
   Future<void> startDiscovery() async {
     state = state.copyWith(isScanning: true, error: null);
@@ -168,7 +169,7 @@ class P2PControllerState {
 
 final p2pControllerProvider =
     StateNotifierProvider<P2PController, P2PControllerState>((ref) {
-  final service = ref.watch(p2pServiceProvider);
-  final syncEngine = ref.watch(syncEngineProvider);
-  return P2PController(service, syncEngine);
-});
+      final service = ref.watch(p2pServiceProvider);
+      final syncEngine = ref.watch(syncEngineProvider);
+      return P2PController(service, syncEngine);
+    });

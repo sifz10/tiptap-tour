@@ -5,6 +5,9 @@ import 'package:uuid/uuid.dart';
 
 const _uuid = Uuid();
 
+Map<String, dynamic> _withoutNulls(Map<String, dynamic> values) =>
+    Map.fromEntries(values.entries.where((entry) => entry.value != null));
+
 enum P2PMessageType {
   discovery,
   handshake,
@@ -16,6 +19,7 @@ enum P2PMessageType {
   heartbeat,
   disconnect,
   routeAnnounce,
+  keyAnnounce,
 }
 
 class MeshMetadata {
@@ -42,10 +46,10 @@ class MeshMetadata {
   bool hasVisited(String nodeId) => hopPath.contains(nodeId);
 
   Map<String, dynamic> toJson() => {
-        'originId': originId,
-        'ttl': ttl,
-        'hopPath': hopPath,
-      };
+    'originId': originId,
+    'ttl': ttl,
+    'hopPath': hopPath,
+  };
 
   factory MeshMetadata.fromJson(Map<String, dynamic> json) {
     return MeshMetadata(
@@ -106,13 +110,13 @@ class P2PMessage {
   }
 
   Map<String, dynamic> toJson() => {
-        'type': type.name,
-        'senderId': senderId,
-        if (targetId != null) 'targetId': targetId,
-        'messageId': messageId,
-        'payload': payload,
-        'timestamp': timestamp,
-      };
+    'type': type.name,
+    'senderId': senderId,
+    if (targetId != null) 'targetId': targetId,
+    'messageId': messageId,
+    'payload': payload,
+    'timestamp': timestamp,
+  };
 
   factory P2PMessage.fromJson(Map<String, dynamic> json) {
     return P2PMessage(
@@ -133,10 +137,7 @@ class P2PMessage {
     final length = jsonBytes.length;
     final buffer = ByteData(4);
     buffer.setUint32(0, length, Endian.big);
-    return Uint8List.fromList([
-      ...buffer.buffer.asUint8List(),
-      ...jsonBytes,
-    ]);
+    return Uint8List.fromList([...buffer.buffer.asUint8List(), ...jsonBytes]);
   }
 
   static P2PMessage? decodeFrom(Uint8List data) {
@@ -181,11 +182,11 @@ class P2PMessage {
       senderId: deviceId,
       messageId: _uuid.v4(),
       timestamp: DateTime.now().millisecondsSinceEpoch.toString(),
-      payload: {
+      payload: _withoutNulls({
         'displayName': displayName,
-        if (tripIds != null) 'tripIds': tripIds,
-        if (publicKey != null) 'publicKey': publicKey,
-      },
+        'tripIds': tripIds,
+        'publicKey': publicKey,
+      }),
     );
   }
 
@@ -200,11 +201,11 @@ class P2PMessage {
       senderId: deviceId,
       messageId: _uuid.v4(),
       timestamp: DateTime.now().millisecondsSinceEpoch.toString(),
-      payload: {
+      payload: _withoutNulls({
         'displayName': displayName,
-        if (tripIds != null) 'tripIds': tripIds,
-        if (publicKey != null) 'publicKey': publicKey,
-      },
+        'tripIds': tripIds,
+        'publicKey': publicKey,
+      }),
     );
   }
 
@@ -218,10 +219,7 @@ class P2PMessage {
       senderId: deviceId,
       messageId: _uuid.v4(),
       timestamp: DateTime.now().millisecondsSinceEpoch.toString(),
-      payload: {
-        'tableName': tableName,
-        if (afterHlc != null) 'afterHlc': afterHlc,
-      },
+      payload: _withoutNulls({'tableName': tableName, 'afterHlc': afterHlc}),
     );
   }
 
@@ -293,15 +291,27 @@ class P2PMessage {
   factory P2PMessage.routeAnnounce({
     required String deviceId,
     required Map<String, int> reachablePeers,
+    Map<String, Map<String, dynamic>> peerInfo = const {},
   }) {
     return P2PMessage(
       type: P2PMessageType.routeAnnounce,
       senderId: deviceId,
       messageId: _uuid.v4(),
       timestamp: DateTime.now().millisecondsSinceEpoch.toString(),
-      payload: {
-        'reachable': reachablePeers,
-      },
+      payload: {'reachable': reachablePeers, 'peers': peerInfo},
+    );
+  }
+
+  factory P2PMessage.keyAnnounce({
+    required String deviceId,
+    required String publicKey,
+  }) {
+    return P2PMessage(
+      type: P2PMessageType.keyAnnounce,
+      senderId: deviceId,
+      messageId: _uuid.v4(),
+      timestamp: DateTime.now().millisecondsSinceEpoch.toString(),
+      payload: {'publicKey': publicKey},
     );
   }
 

@@ -50,11 +50,22 @@ class RoutingTable {
     return entry.nextHopId;
   }
 
+  RoutingEntry? getEntry(String targetId) {
+    final nextHop = getNextHop(targetId);
+    if (nextHop == null) return null;
+    return _routes[targetId];
+  }
+
   Map<String, int> getReachablePeers() {
     removeStaleEntries();
     return {
       for (final entry in _routes.entries) entry.key: entry.value.hopCount,
     };
+  }
+
+  Map<String, RoutingEntry> get entries {
+    removeStaleEntries();
+    return Map.unmodifiable(_routes);
   }
 
   void removeRoutesVia(String peerDeviceId) {
