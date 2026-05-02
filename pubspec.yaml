@@ -1,0 +1,91 @@
+name: tiptap_tour
+description: "Group trip expense manager with offline P2P communication"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # Navigation
+  go_router: ^14.8.1
+
+  # Database (Offline-first)
+  drift: ^2.25.0
+  sqlite3_flutter_libs: ^0.5.30
+  path_provider: ^2.1.5
+  path: ^1.9.1
+
+  # Key-Value Storage
+  hive_flutter: ^1.1.0
+
+  # Serialization
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+
+  # Unique IDs
+  uuid: ^4.5.1
+
+  # Date/Time & Formatting
+  intl: ^0.20.2
+
+  # Connectivity
+  connectivity_plus: ^6.1.4
+
+  # Image Handling
+  image_picker: ^1.1.2
+  flutter_image_compress: ^2.3.0
+
+  # UI & Animations
+  flutter_animate: ^4.5.2
+  shimmer: ^3.0.0
+  fl_chart: ^0.70.2
+  google_fonts: ^6.2.1
+
+  # Permissions
+  permission_handler: ^11.4.0
+
+  # Local Notifications
+  flutter_local_notifications: ^18.0.1
+
+  # PDF & CSV Export
+  pdf: ^3.11.2
+  csv: ^6.0.0
+
+  # DI
+  get_it: ^8.0.3
+  injectable: ^2.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+  # Code Generation
+  build_runner: ^2.4.14
+  drift_dev: ^2.25.0
+  freezed: ^2.5.8
+  json_serializable: ^6.9.4
+  riverpod_generator: ^2.6.3
+  injectable_generator: ^2.7.0
+
+  # Testing
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
