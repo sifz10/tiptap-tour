@@ -10,6 +10,7 @@ import 'package:tiptap_tour/presentation/theme/app_animations.dart';
 import 'package:tiptap_tour/presentation/theme/app_colors.dart';
 import 'package:tiptap_tour/presentation/widgets/chat_bubble.dart';
 import 'package:tiptap_tour/presentation/widgets/empty_state.dart';
+import 'package:tiptap_tour/presentation/widgets/error_state.dart';
 
 class ChatView extends ConsumerStatefulWidget {
   final String tripId;
@@ -144,7 +145,11 @@ class _ChatViewState extends ConsumerState<ChatView> {
             },
             loading: () =>
                 const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Error: $e')),
+            error: (e, _) => ErrorState(
+              message: e.toString(),
+              onRetry: () =>
+                  ref.invalidate(messagesByTripProvider(widget.tripId)),
+            ),
           ),
         ),
         if (_replyToId != null) _buildReplyBanner(),

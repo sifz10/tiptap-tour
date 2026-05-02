@@ -5,6 +5,7 @@ import 'package:tiptap_tour/presentation/screens/expense/expense_list_view.dart'
 import 'package:tiptap_tour/presentation/screens/balance/balance_view.dart';
 import 'package:tiptap_tour/presentation/screens/chat/chat_view.dart';
 import 'package:tiptap_tour/presentation/screens/trip/members_view.dart';
+import 'package:tiptap_tour/presentation/widgets/error_state.dart';
 
 class TripDetailScreen extends ConsumerWidget {
   final String tripId;
@@ -103,7 +104,10 @@ class TripDetailScreen extends ConsumerWidget {
       ),
       error: (error, _) => Scaffold(
         appBar: AppBar(),
-        body: Center(child: Text('Error: $error')),
+        body: ErrorState(
+          message: error.toString(),
+          onRetry: () => ref.invalidate(tripByIdProvider(tripId)),
+        ),
       ),
     );
   }

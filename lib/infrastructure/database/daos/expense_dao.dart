@@ -101,4 +101,10 @@ class ExpenseDao extends DatabaseAccessor<AppDatabase> with _$ExpenseDaoMixin {
                 (s) => s.tripId.equals(tripId) & s.isDeleted.equals(false))
             ..orderBy([(s) => OrderingTerm.desc(s.settledAt)]))
           .get();
+
+  Future<List<Expense>> getAllExpenses() =>
+      (select(expenses)
+            ..where((e) => e.isDeleted.equals(false))
+            ..orderBy([(e) => OrderingTerm.desc(e.expenseDate)]))
+          .get();
 }

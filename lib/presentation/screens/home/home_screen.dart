@@ -10,6 +10,7 @@ import 'package:tiptap_tour/presentation/theme/app_animations.dart';
 import 'package:tiptap_tour/presentation/theme/glass_theme.dart';
 import 'package:tiptap_tour/presentation/screens/home/create_trip_sheet.dart';
 import 'package:tiptap_tour/presentation/widgets/empty_state.dart';
+import 'package:tiptap_tour/presentation/widgets/error_state.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -74,7 +75,10 @@ class HomeScreen extends ConsumerWidget {
                 child: Center(child: CircularProgressIndicator()),
               ),
               error: (error, _) => SliverFillRemaining(
-                child: Center(child: Text('Error: $error')),
+                child: ErrorState(
+                  message: error.toString(),
+                  onRetry: () => ref.invalidate(tripsProvider),
+                ),
               ),
             ),
           ),

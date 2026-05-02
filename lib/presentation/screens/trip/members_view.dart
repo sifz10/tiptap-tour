@@ -7,6 +7,7 @@ import 'package:tiptap_tour/presentation/theme/app_colors.dart';
 import 'package:tiptap_tour/presentation/theme/glass_theme.dart';
 import 'package:tiptap_tour/presentation/widgets/avatar_circle.dart';
 import 'package:tiptap_tour/presentation/widgets/empty_state.dart';
+import 'package:tiptap_tour/presentation/widgets/error_state.dart';
 
 class MembersView extends ConsumerWidget {
   final String tripId;
@@ -54,7 +55,10 @@ class MembersView extends ConsumerWidget {
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) => ErrorState(
+        message: e.toString(),
+        onRetry: () => ref.invalidate(usersByTripProvider(tripId)),
+      ),
     );
   }
 }

@@ -8,6 +8,7 @@ import 'package:tiptap_tour/presentation/theme/app_animations.dart';
 import 'package:tiptap_tour/presentation/theme/glass_theme.dart';
 import 'package:tiptap_tour/presentation/screens/expense/add_expense_sheet.dart';
 import 'package:tiptap_tour/presentation/widgets/empty_state.dart';
+import 'package:tiptap_tour/presentation/widgets/error_state.dart';
 
 class ExpenseListView extends ConsumerWidget {
   final String tripId;
@@ -74,7 +75,10 @@ class ExpenseListView extends ConsumerWidget {
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(child: Text('Error: $error')),
+          error: (error, _) => ErrorState(
+            message: error.toString(),
+            onRetry: () => ref.invalidate(expensesByTripProvider(tripId)),
+          ),
         ),
         Positioned(
           bottom: 24,
