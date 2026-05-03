@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:tiptap_tour/application/providers/database_provider.dart';
 import 'package:tiptap_tour/domain/entities/p2p_peer.dart';
 import 'package:tiptap_tour/domain/enums/connection_state.dart';
@@ -88,9 +90,40 @@ class P2PController extends StateNotifier<P2PControllerState> {
   Future<void> startDiscovery() async {
     state = state.copyWith(isScanning: true, error: null);
     try {
+      await _requestPermissions();
       await _service.startDiscovery();
     } catch (e) {
       state = state.copyWith(isScanning: false, error: e.toString());
+    }
+  }
+
+  Future<void> _requestPermissions() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+
+    final permissions = <Permission>[];
+
+    if (state.bleEnabled) {
+      permissions.addAll([
+        Permission.bluetoothScan,
+        Permission.bluetoothConnect,
+        Permission.bluetoothAdvertise,
+      ]);
+    }
+
+    if (state.wifiEnabled || state.bleEnabled) {
+      permissions.add(Permission.locationWhenInUse);
+    }
+
+    if (permissions.isEmpty) return;
+
+    final statuses = await permissions.request();
+    final denied = statuses.entries
+        .where((e) => !e.value.isGranted)
+        .map((e) => e.key.toString())
+        .toList();
+
+    if (denied.isNotEmpty) {
+      throw Exception('Permissions denied: ${denied.join(", ")}');
     }
   }
 

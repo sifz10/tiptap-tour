@@ -187,20 +187,32 @@ class CompositeTransport implements P2PTransport {
 
   @override
   Future<void> startServer() async {
-    if (_wifiEnabled) await _wifi.startServer();
-    if (_bleEnabled) await _ble.startServer();
+    if (_wifiEnabled) {
+      try { await _wifi.startServer(); } catch (_) {}
+    }
+    if (_bleEnabled) {
+      try { await _ble.startServer(); } catch (_) {}
+    }
   }
 
   @override
   Future<void> startDiscovery() async {
-    if (_wifiEnabled) await _wifi.startDiscovery();
-    if (_bleEnabled) await _ble.startDiscovery();
+    if (_wifiEnabled) {
+      try { await _wifi.startDiscovery(); } catch (_) {}
+    }
+    if (_bleEnabled) {
+      try { await _ble.startDiscovery(); } catch (_) {}
+    }
   }
 
   @override
   Future<void> stopDiscovery() async {
-    if (_wifiEnabled) await _wifi.stopDiscovery();
-    if (_bleEnabled) await _ble.stopDiscovery();
+    if (_wifiEnabled) {
+      try { await _wifi.stopDiscovery(); } catch (_) {}
+    }
+    if (_bleEnabled) {
+      try { await _ble.stopDiscovery(); } catch (_) {}
+    }
   }
 
   @override

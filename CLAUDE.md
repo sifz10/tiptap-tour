@@ -87,9 +87,20 @@ lib/
 │   │   └── tables/
 │   ├── p2p/
 │   │   ├── ble/
+│   │   │   ├── ble_chunker.dart
+│   │   │   ├── ble_constants.dart
+│   │   │   ├── ble_gatt_server.dart
+│   │   │   └── ble_transport.dart
 │   │   ├── crypto/
+│   │   │   ├── encrypted_transport.dart
+│   │   │   └── key_store.dart
 │   │   ├── mesh/
+│   │   │   ├── mesh_router.dart
+│   │   │   ├── routing_table.dart
+│   │   │   └── seen_message_cache.dart
 │   │   ├── composite_transport.dart
+│   │   ├── mesh_composite_transport.dart
+│   │   ├── p2p_diagnostics.dart
 │   │   ├── p2p_message.dart
 │   │   ├── p2p_service.dart
 │   │   ├── transport.dart
@@ -117,6 +128,7 @@ High-value providers:
 - `p2pServiceProvider` — currently returns `MeshCompositeTransport`.
 - `syncEngineProvider` — sync engine built on the active transport.
 - `p2pControllerProvider` — start/stop discovery, connect/disconnect, sync, toggle Wi-Fi/BLE.
+- `p2pDiagnosticsProvider` — aggregated diagnostics (direct/mesh/encrypted peer counts, route info).
 
 Current P2P provider wiring:
 - `p2pServiceProvider` now returns `MeshCompositeTransport`.
@@ -187,15 +199,16 @@ Files:
 - `ble/ble_transport.dart`
 
 Native platform pieces:
-- Android: custom Kotlin GATT server plugin.
-- iOS: custom Swift/CoreBluetooth peripheral plugin.
+- Android: custom Kotlin GATT server plugin (`android/app/src/main/kotlin/com/ryven/tiptap_tour/BleGattServerPlugin.kt`).
+- iOS: custom Swift/CoreBluetooth peripheral plugin (`ios/Runner/BleGattServerPlugin.swift`).
 
 BLE design:
-- Discovery via BLE scanning for a dedicated service UUID.
+- Discovery via BLE scanning for a dedicated service UUID (`a1b2c3d4-e5f6-7890-abcd-ef1234567890`).
 - Peripheral advertising from native GATT server.
-- Data transfer via GATT characteristics.
-- Chunking and reassembly are required due to BLE MTU limits.
-- Default duty cycle is designed for power savings.
+- Three GATT characteristics: message write (`...567891`), message notify (`...567892`), device info (`...567893`).
+- Chunking and reassembly via `BleChunker` with 5-byte headers (CRC-16 hash, sequence, total, length).
+- MTU negotiation: default 20 bytes, preferred 512 bytes.
+- Default duty cycle: scan 10s on / 20s pause, `lowPower` scan mode, `ADVERTISE_MODE_LOW_POWER`.
 
 Practical note:
 - This code compiles and analyzes, but it still needs real-device validation across iOS and Android. BLE simulator coverage is not enough.
@@ -207,13 +220,33 @@ Practical note:
 What it does:
 - Starts Wi-Fi and BLE in parallel when enabled.
 - Merges discovery, connected peers, state, and incoming message streams.
-- Tracks which peer is using which transport.
+- Tracks which peer is using which transport via `_peerTransport` map.
 - Routes outgoing direct messages to the correct underlying transport.
 - Supports runtime toggles for Wi-Fi and BLE from the Nearby screen.
+- Deduplication: if the same peer appears on both transports, Wi-Fi takes priority (higher throughput).
+- State resolution priority: syncing > connected > connecting > discovering > error > disconnected.
 
 Important note:
 - The app does not expose `CompositeTransport` directly anymore.
 - It is wrapped by `MeshCompositeTransport`, which adds route announcements and relay forwarding above the physical transports.
+
+### MeshCompositeTransport
+
+`MeshCompositeTransport` is the app-facing transport that wires all layers together.
+
+Construction chain:
+```
+MeshCompositeTransport
+  └→ EncryptedTransport (encrypts chat/sync payloads)
+       └→ MeshRouter (adds multi-hop relay + route announcements)
+            └→ CompositeTransport (merges Wi-Fi + BLE)
+                 ├→ WifiTransport (UDP discovery + TCP sockets)
+                 └→ BleTransport (BLE GATT client + native server)
+```
+
+What it adds beyond the layers:
+- `diagnostics` getter aggregating peer info from MeshRouter, transport type from CompositeTransport, and encryption readiness from EncryptedTransport.
+- Delegates `setWifiEnabled()`/`setBleEnabled()` to CompositeTransport.
 
 ### P2P Protocol
 
@@ -247,6 +280,9 @@ Phase 6 encryption is implemented at code level in `lib/infrastructure/p2p/crypt
 - Chat and sync payloads are encrypted with AES-256-GCM using X25519 shared secrets.
 - Transport headers stay visible (`type`, `senderId`, `targetId`, `messageId`, mesh metadata) so relay nodes can forward without decrypting.
 - Relay nodes should not be able to read encrypted chat/sync payloads.
+- Only `syncRequest`, `syncResponse`, and `chatMessage` types are encrypted. All other types (discovery, handshake, heartbeat, routeAnnounce, keyAnnounce, etc.) pass through unencrypted.
+- On peer connection, `keyAnnounce` is broadcast automatically. Shared secrets are cached per peer.
+- If a peer's key is unknown when sending, the transport re-announces its own key and throws `StateError`.
 
 Important limitations:
 - There is not yet a user-facing trust/fingerprint verification UI.
@@ -261,12 +297,14 @@ Mesh groundwork exists in `lib/infrastructure/p2p/mesh/`:
 - `seen_message_cache.dart`
 
 What is already implemented there:
-- Route announcements.
-- Multi-hop forwarding using `targetId`.
-- TTL-based loop prevention.
-- Seen-message deduplication.
-- Route expiry and next-hop tracking.
-- Diagnostics for direct vs mesh routes, hop counts, next hops, and peer metadata.
+- Route announcements broadcast every 15 seconds with reachable peer map.
+- Multi-hop forwarding using `targetId` and routing table next-hop lookup.
+- TTL-based loop prevention (default TTL = 5 hops).
+- Seen-message deduplication (max 1000 entries, 5-minute expiry).
+- Route expiry (60 seconds per routing entry, Bellman-Ford style shortest path).
+- Flood fallback for unknown destinations (excluding already-visited nodes).
+- `_routedPeers` map tracks mesh-reachable peers learned from `routeAnnounce`.
+- `peerDiagnostics` getter returns `P2PPeerDiagnostic` list with isDirect, hopCount, nextHopId, transportLabel, encryptionReady for each peer.
 
 Current live behavior:
 - `MeshRouter` is active through `MeshCompositeTransport`.
@@ -355,6 +393,9 @@ Important router note:
 - BLE code requires real devices for meaningful validation.
 - BLE on iOS and Android differs in advertising behavior, connection timing, and background restrictions.
 - Mesh and encryption are active in code, but still need real-device validation before calling them production-ready.
+- Android BLE requires runtime permission requests (BLUETOOTH_SCAN, BLUETOOTH_CONNECT, BLUETOOTH_ADVERTISE) before any BLE operation. These are requested automatically in `P2PController.startDiscovery()` via `permission_handler`.
+- `CompositeTransport.startDiscovery()` wraps each transport start in try/catch so one failing transport doesn't block the other.
+- The `INTERNET` permission must be in the main `AndroidManifest.xml`, not just the debug manifest, for TCP/UDP sockets to work on real devices.
 
 ## What Another Agent Should Assume
 
