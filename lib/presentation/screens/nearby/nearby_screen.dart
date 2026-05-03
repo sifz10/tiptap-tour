@@ -333,14 +333,26 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
   }
 
   Widget _buildRadarSection(P2PControllerState controllerState) {
-    return SizedBox(
-          height: 200,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+          height: 220,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: [
+                AppColors.primary.withAlpha(isDark ? 12 : 8),
+                Colors.transparent,
+              ],
+              radius: 0.7,
+            ),
+          ),
           child: Center(
             child: AnimatedBuilder(
               animation: _radarController,
               builder: (context, child) {
                 return CustomPaint(
-                  size: const Size(200, 200),
+                  size: const Size(210, 210),
                   painter: _RadarPainter(
                     progress: _radarController.value,
                     isActive: controllerState.isScanning,
@@ -451,79 +463,172 @@ class _RadarPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final maxRadius = size.width / 2;
+    final maxRadius = size.width / 2 - 4;
+    final isDark = brightness == Brightness.dark;
 
-    // Background circles
-    for (int i = 1; i <= 3; i++) {
-      final radius = maxRadius * (i / 3);
+    // Concentric guide rings with subtle gradient feel
+    for (int i = 1; i <= 4; i++) {
+      final radius = maxRadius * (i / 4);
+      final alpha = isDark ? (10 + i * 3) : (15 + i * 4);
       final paint = Paint()
-        ..color = color.withAlpha(brightness == Brightness.light ? 20 : 15)
+        ..color = color.withAlpha(alpha)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1;
+        ..strokeWidth = 0.8;
       canvas.drawCircle(center, radius, paint);
     }
 
-    // Cross lines
-    final linePaint = Paint()
-      ..color = color.withAlpha(brightness == Brightness.light ? 15 : 10)
+    // Subtle cross-hair lines
+    final crossAlpha = isDark ? 12 : 18;
+    final crossPaint = Paint()
+      ..color = color.withAlpha(crossAlpha)
       ..strokeWidth = 0.5;
     canvas.drawLine(
       Offset(center.dx, center.dy - maxRadius),
       Offset(center.dx, center.dy + maxRadius),
-      linePaint,
+      crossPaint,
     );
     canvas.drawLine(
       Offset(center.dx - maxRadius, center.dy),
       Offset(center.dx + maxRadius, center.dy),
-      linePaint,
+      crossPaint,
     );
 
-    if (isActive) {
-      // Sweep gradient
-      final sweepAngle = progress * 2 * pi;
-      final sweepPaint = Paint()
-        ..shader = SweepGradient(
-          startAngle: sweepAngle - 0.8,
-          endAngle: sweepAngle,
-          colors: [color.withAlpha(0), color.withAlpha(60)],
-          stops: const [0.0, 1.0],
-          transform: GradientRotation(sweepAngle - 0.8),
-        ).createShader(Rect.fromCircle(center: center, radius: maxRadius));
-      canvas.drawCircle(center, maxRadius, sweepPaint);
+    // Diagonal cross-hairs for premium look
+    final diagLength = maxRadius * 0.7;
+    for (final angle in [pi / 4, 3 * pi / 4, 5 * pi / 4, 7 * pi / 4]) {
+      final dx = cos(angle) * diagLength;
+      final dy = sin(angle) * diagLength;
+      canvas.drawLine(
+        center,
+        Offset(center.dx + dx, center.dy + dy),
+        Paint()..color = color.withAlpha(isDark ? 6 : 8)..strokeWidth = 0.3,
+      );
+    }
 
-      // Pulse rings
-      for (int i = 0; i < 3; i++) {
-        final ringProgress = (progress + i * 0.33) % 1.0;
-        final ringRadius = maxRadius * ringProgress;
-        final ringAlpha = ((1.0 - ringProgress) * 40).toInt();
-        final ringPaint = Paint()
-          ..color = color.withAlpha(ringAlpha)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2;
-        canvas.drawCircle(center, ringRadius, ringPaint);
+    if (isActive) {
+      final sweepAngle = progress * 2 * pi;
+
+      // Sweep trail — drawn as a series of thin arc segments with fading alpha
+      final trailLength = pi / 2.5;
+      const trailSegments = 30;
+      for (int i = 0; i < trailSegments; i++) {
+        final t = i / trailSegments;
+        final segAngle = sweepAngle - trailLength * (1 - t);
+        final nextAngle = sweepAngle - trailLength * (1 - (i + 1) / trailSegments);
+        final alpha = (t * t * (isDark ? 35 : 45)).toInt();
+        if (alpha <= 0) continue;
+
+        final trailPaint = Paint()
+          ..color = color.withAlpha(alpha)
+          ..style = PaintingStyle.fill;
+
+        final path = Path()
+          ..moveTo(center.dx, center.dy)
+          ..lineTo(
+            center.dx + maxRadius * cos(segAngle - pi / 2),
+            center.dy + maxRadius * sin(segAngle - pi / 2),
+          )
+          ..arcTo(
+            Rect.fromCircle(center: center, radius: maxRadius),
+            segAngle - pi / 2,
+            nextAngle - segAngle,
+            false,
+          )
+          ..close();
+        canvas.drawPath(path, trailPaint);
       }
 
-      // Sweep line
+      // Main sweep line with gradient
       final lineEndX = center.dx + maxRadius * cos(sweepAngle - pi / 2);
       final lineEndY = center.dy + maxRadius * sin(sweepAngle - pi / 2);
       final sweepLinePaint = Paint()
-        ..color = color.withAlpha(100)
-        ..strokeWidth = 1.5;
+        ..shader = LinearGradient(
+          colors: [
+            color.withAlpha(20),
+            color.withAlpha(180),
+          ],
+        ).createShader(
+          Rect.fromPoints(center, Offset(lineEndX, lineEndY)),
+        )
+        ..strokeWidth = 2.0
+        ..strokeCap = StrokeCap.round;
       canvas.drawLine(center, Offset(lineEndX, lineEndY), sweepLinePaint);
+
+      // Sweep tip dot
+      final tipGlow = Paint()
+        ..color = color.withAlpha(60)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      canvas.drawCircle(Offset(lineEndX, lineEndY), 4, tipGlow);
+      canvas.drawCircle(
+        Offset(lineEndX, lineEndY),
+        2.5,
+        Paint()..color = color.withAlpha(200),
+      );
+
+      // Expanding pulse rings — only 2 for cleaner look
+      for (int i = 0; i < 2; i++) {
+        final ringProgress = (progress + i * 0.5) % 1.0;
+        final ringRadius = maxRadius * ringProgress;
+        final ringAlpha = ((1.0 - ringProgress) * (isDark ? 30 : 40)).toInt();
+        if (ringAlpha <= 0) continue;
+        final ringPaint = Paint()
+          ..color = color.withAlpha(ringAlpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5;
+        canvas.drawCircle(center, ringRadius, ringPaint);
+      }
     }
 
-    // Center dot
-    final dotRadius = isActive ? 6.0 + pulseValue * 2.0 : 6.0;
-    final dotPaint = Paint()..color = color;
-    canvas.drawCircle(center, dotRadius, dotPaint);
-
-    // Center glow
+    // Outer rim glow
     if (isActive) {
-      final glowPaint = Paint()
-        ..color = color.withAlpha((pulseValue * 30).toInt())
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-      canvas.drawCircle(center, dotRadius + 4, glowPaint);
+      final rimPaint = Paint()
+        ..color = color.withAlpha(isDark ? 15 : 20)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+      canvas.drawCircle(center, maxRadius, rimPaint);
     }
+
+    // Center device dot — multi-layer for depth
+    final baseRadius = isActive ? 5.0 + pulseValue * 1.5 : 5.0;
+
+    // Outer glow
+    if (isActive) {
+      canvas.drawCircle(
+        center,
+        baseRadius + 8,
+        Paint()
+          ..color = color.withAlpha((pulseValue * 20).toInt())
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+      );
+    }
+
+    // Middle ring
+    canvas.drawCircle(
+      center,
+      baseRadius + 3,
+      Paint()
+        ..color = color.withAlpha(isActive ? 30 : 15)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+
+    // Core dot with gradient
+    final dotPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          color,
+          color.withAlpha(180),
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: baseRadius));
+    canvas.drawCircle(center, baseRadius, dotPaint);
+
+    // Tiny highlight on center dot
+    canvas.drawCircle(
+      Offset(center.dx - baseRadius * 0.25, center.dy - baseRadius * 0.25),
+      baseRadius * 0.35,
+      Paint()..color = Colors.white.withAlpha(isActive ? 80 : 40),
+    );
   }
 
   @override

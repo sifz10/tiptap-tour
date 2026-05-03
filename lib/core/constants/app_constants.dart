@@ -1,5 +1,5 @@
 abstract final class AppConstants {
-  static const String appName = 'Tiptap Tour';
+  static const String appName = 'Tip Tap Tour';
   static const String defaultCurrency = 'BDT';
   static const int p2pScanDurationSeconds = 10;
   static const int p2pScanIntervalSeconds = 60;

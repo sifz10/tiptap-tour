@@ -34,7 +34,7 @@ class _TiptapTourAppState extends ConsumerState<TiptapTourApp> {
     final themeMode = ref.watch(themeProvider);
 
     return MaterialApp.router(
-      title: 'Tiptap Tour',
+      title: 'Tip Tap Tour',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
