@@ -79,7 +79,12 @@ class EncryptedTransport implements P2PTransport {
   Set<String> get encryptedPeerIds => Set.unmodifiable(_sharedKeys.keys);
 
   bool hasEncryptionFor(String peerDeviceId) =>
-      _sharedKeys.containsKey(peerDeviceId);
+      _sharedKeys.containsKey(_normalizeId(peerDeviceId));
+
+  String _normalizeId(String peerDeviceId) {
+    final atIndex = peerDeviceId.indexOf('@');
+    return atIndex > 0 ? peerDeviceId.substring(0, atIndex) : peerDeviceId;
+  }
 
   @override
   Future<void> startServer() async {
@@ -106,8 +111,9 @@ class EncryptedTransport implements P2PTransport {
 
   @override
   Future<void> disconnectFromPeer(String peerDeviceId) async {
-    _peerKeys.remove(peerDeviceId);
-    _sharedKeys.remove(peerDeviceId);
+    final normalizedId = _normalizeId(peerDeviceId);
+    _peerKeys.remove(normalizedId);
+    _sharedKeys.remove(normalizedId);
     await _transport.disconnectFromPeer(peerDeviceId);
   }
 
@@ -158,9 +164,10 @@ class EncryptedTransport implements P2PTransport {
       type: KeyPairType.x25519,
     );
 
-    _peerKeys[message.senderId] = publicKey;
-    _sharedKeys.remove(message.senderId);
-    await _sharedKeyFor(message.senderId);
+    final peerId = _normalizeId(message.senderId);
+    _peerKeys[peerId] = publicKey;
+    _sharedKeys.remove(peerId);
+    await _sharedKeyFor(peerId);
   }
 
   Future<P2PMessage> _encryptForPeer(
@@ -169,7 +176,8 @@ class EncryptedTransport implements P2PTransport {
   ) async {
     if (!_shouldEncrypt(message)) return message;
 
-    final sharedKey = await _sharedKeyFor(peerDeviceId);
+    final normalizedId = _normalizeId(peerDeviceId);
+    final sharedKey = await _sharedKeyFor(normalizedId);
     if (sharedKey == null) {
       await announceKey();
       throw StateError('Missing encryption key for $peerDeviceId');
@@ -198,7 +206,8 @@ class EncryptedTransport implements P2PTransport {
   }
 
   Future<P2PMessage?> _decrypt(P2PMessage message) async {
-    final sharedKey = await _sharedKeyFor(message.senderId);
+    final normalizedId = _normalizeId(message.senderId);
+    final sharedKey = await _sharedKeyFor(normalizedId);
     if (sharedKey == null) {
       await announceKey();
       return null;

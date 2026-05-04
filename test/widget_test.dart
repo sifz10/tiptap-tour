@@ -25,7 +25,7 @@ void main() {
     );
     await tester.pumpAndSettle(const Duration(milliseconds: 100));
 
-    expect(find.text('Tiptap Tour'), findsOneWidget);
+    expect(find.text('Tip Tap Tour'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpAndSettle(const Duration(milliseconds: 100));

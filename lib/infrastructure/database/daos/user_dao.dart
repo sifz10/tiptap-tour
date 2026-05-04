@@ -16,6 +16,9 @@ class UserDao extends DatabaseAccessor<AppDatabase> with _$UserDaoMixin {
 
   Future<void> insertUser(UsersCompanion user) => into(users).insert(user);
 
+  Future<void> upsertUser(UsersCompanion user) =>
+      into(users).insertOnConflictUpdate(user);
+
   Future<void> updateUser(UsersCompanion user) =>
       (update(users)..where((u) => u.id.equals(user.id.value)))
           .write(user);

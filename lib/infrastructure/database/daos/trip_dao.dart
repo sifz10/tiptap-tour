@@ -38,7 +38,7 @@ class TripDao extends DatabaseAccessor<AppDatabase> with _$TripDaoMixin {
       (delete(trips)..where((t) => t.id.equals(id))).go();
 
   Future<void> addMember(TripMembersCompanion member) =>
-      into(tripMembers).insert(member);
+      into(tripMembers).insertOnConflictUpdate(member);
 
   Future<void> removeMember(String tripId, String userId) =>
       (delete(tripMembers)

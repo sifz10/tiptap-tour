@@ -35,14 +35,13 @@ class MeshCompositeTransport implements P2PTransport {
 
   P2PDiagnostics get diagnostics {
     final transportMap = _composite.peerTransportMap;
-    final encryptedPeerIds = _encryptedTransport.encryptedPeerIds;
     return P2PDiagnostics(
       wifiEnabled: wifiEnabled,
       bleEnabled: bleEnabled,
       peers: [
         for (final peer in _meshRouter.peerDiagnostics)
           peer.copyWith(
-            encryptionReady: encryptedPeerIds.contains(peer.deviceId),
+            encryptionReady: _encryptedTransport.hasEncryptionFor(peer.deviceId),
             transportLabel: peer.isDirect
                 ? transportMap[peer.deviceId]?.label ?? peer.transportLabel
                 : peer.transportLabel,

@@ -13,6 +13,7 @@ class PeerCard extends StatelessWidget {
   final VoidCallback? onConnect;
   final VoidCallback? onDisconnect;
   final VoidCallback? onSync;
+  final VoidCallback? onAddToTrip;
   final int animationIndex;
 
   const PeerCard({
@@ -23,6 +24,7 @@ class PeerCard extends StatelessWidget {
     this.onConnect,
     this.onDisconnect,
     this.onSync,
+    this.onAddToTrip,
     this.animationIndex = 0,
   });
 
@@ -103,6 +105,13 @@ class PeerCard extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                IconButton(
+                  icon: const Icon(Icons.group_add_rounded),
+                  onPressed: onAddToTrip,
+                  tooltip: 'Add to trip',
+                  color: AppColors.primary,
+                  iconSize: 22,
+                ),
                 IconButton(
                   icon: const Icon(Icons.sync_rounded),
                   onPressed: onSync,

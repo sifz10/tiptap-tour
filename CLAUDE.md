@@ -1,6 +1,6 @@
-# Tiptap Tour
+# Tip Tap Tour
 
-Offline-first group trip expense manager for iOS and Android. The app already supports trip management, partial-member expense splitting, balances, settlements, local chat persistence, and P2P sync/chat foundations. The networking stack is now in a transition from Wi-Fi-only direct sockets to a transport-agnostic offline stack with BLE and future mesh relay.
+Offline-first group trip expense manager for iOS and Android. The app name is **"Tip Tap Tour"** (three words, spaces between). The app already supports trip management, partial-member expense splitting, balances, settlements, local chat persistence, and P2P sync/chat foundations. The networking stack is now in a transition from Wi-Fi-only direct sockets to a transport-agnostic offline stack with BLE and future mesh relay.
 
 ## Build & Run
 
@@ -63,6 +63,10 @@ Phase 4 polish that already landed:
 - `EmptyState` and `ErrorState` were redesigned into modern glass UI.
 - Excessive top spacing on top-level screens was tightened.
 - `app.dart` was changed to keep one stable GoRouter instance and fix the GlobalKey collision bug.
+- App renamed from "Tiptap Tour" to "Tip Tap Tour" across all surfaces (AndroidManifest, Info.plist, app.dart, app_constants.dart, home_screen, settings_screen, onboarding).
+- Onboarding screen redesigned with premium glassmorphism: gradient background, decorative orbs, logo image from `assets/logo/logo.png`, gradient title text, frosted-glass input card with backdrop blur, gradient button.
+- Nearby radar redesigned with premium `_RadarPainter`: 4 concentric guide rings, diagonal cross-hairs, arc-segment sweep trail (30 segments), gradient sweep line with tip dot, 2 clean pulse rings, outer rim glow, multi-layer center dot with highlight.
+- Logo asset path added to `pubspec.yaml` (`assets/logo/`).
 
 ## Project Structure
 
@@ -336,6 +340,19 @@ Recommended next implementation order:
 4. Add fingerprint/trust UI for encryption identity verification.
 5. Tune scan/advertise intervals for battery life.
 
+## Assets
+
+```text
+assets/
+├── images/
+├── icons/
+├── animations/
+└── logo/
+    └── logo.png          # Mountain scene with "Tip Tap Tour" text overlay. Used on onboarding screen.
+```
+
+All asset folders are registered in `pubspec.yaml` under `flutter: assets:`.
+
 ## UI Patterns
 
 Use these patterns consistently:
@@ -345,6 +362,8 @@ Use these patterns consistently:
 - `ErrorState` for user-facing failures with retry when possible.
 - `flutter_animate` plus `AppAnimations` constants for entrance motion.
 - `AvatarCircle` for user identity.
+- For premium screens, use `BackdropFilter` + `ImageFilter.blur` for frosted glass, gradient backgrounds with decorative orbs, and gradient text via `Paint()..shader`.
+- The onboarding screen is the visual identity — keep it premium with the logo, gradient text, and glass card.
 
 ## Screen Notes
 
@@ -358,6 +377,7 @@ Nearby screen specifics:
 - It is the control surface for discovery and peer connections.
 - It now includes Wi-Fi and Bluetooth toggle chips backed by `p2pControllerProvider`.
 - It includes a Network Status panel for Phase 7 field testing: direct peers, mesh peers, encrypted peers, route hop count, next hop, and transport state.
+- Radar uses a custom `_RadarPainter` with arc-segment sweep trail, gradient sweep line, pulse rings, and multi-layer center dot. The painter takes `progress`, `isActive`, `pulseValue`, `color`, and `brightness`.
 
 Summary screen specifics:
 - Uses `summaryDataProvider`.
@@ -397,6 +417,12 @@ Important router note:
 - `CompositeTransport.startDiscovery()` wraps each transport start in try/catch so one failing transport doesn't block the other.
 - The `INTERNET` permission must be in the main `AndroidManifest.xml`, not just the debug manifest, for TCP/UDP sockets to work on real devices.
 
+## App Name and Branding
+
+- App name is **"Tip Tap Tour"** everywhere: AndroidManifest `android:label`, iOS `CFBundleDisplayName` and `CFBundleName`, `AppConstants.appName`, MaterialApp `title`, onboarding screen, home screen header, settings about section.
+- iOS Bluetooth permission strings also reference "Tip Tap Tour".
+- The logo at `assets/logo/logo.png` is a mountain scene with blue sky and the app name overlaid. It is used prominently on the onboarding screen.
+
 ## What Another Agent Should Assume
 
 If you are continuing this work:
@@ -404,4 +430,6 @@ If you are continuing this work:
 - The live transport is `MeshCompositeTransport`, not the legacy single `P2PService` design.
 - Mesh routing is integrated at code level but not yet real-device validated.
 - Encryption is implemented at code level for chat/sync payloads, but trust UI and real-device validation are still pending.
+- The app name is "Tip Tap Tour" (not "Tiptap Tour") — this was changed across all surfaces.
+- The onboarding and radar UI have been polished to premium quality — do not regress them to simpler designs.
 - The most valuable next step is real-device mesh + encryption testing, then battery/background hardening.

@@ -55,6 +55,7 @@ class CreateUserNotifier extends StateNotifier<AsyncValue<void>> {
 
       final settingsBox = Hive.box('settings');
       await settingsBox.put('userId', userId);
+      await settingsBox.put('displayName', displayName);
 
       state = const AsyncValue.data(null);
       return userId;

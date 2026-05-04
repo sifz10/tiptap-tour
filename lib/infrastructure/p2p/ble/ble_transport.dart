@@ -207,8 +207,12 @@ class BleTransport implements P2PTransport {
       _setState(P2PConnectionState.connected);
       _notifyConnectedPeers();
     } catch (e) {
-      _setState(P2PConnectionState.error);
-      rethrow;
+      _setState(
+        _connections.isEmpty
+            ? P2PConnectionState.disconnected
+            : P2PConnectionState.connected,
+      );
+      throw Exception('BLE connection failed: $e');
     }
   }
 
@@ -261,9 +265,16 @@ class BleTransport implements P2PTransport {
     final writeChar = connection.writeChar;
     if (writeChar == null) return;
 
+    final allowNoResponse = writeChar.properties.writeWithoutResponse;
     final chunks = BleChunker.split(data, connection.negotiatedMtu);
     for (final chunk in chunks) {
-      await writeChar.write(chunk.encode().toList(), withoutResponse: false);
+      try {
+        await writeChar
+            .write(chunk.encode().toList(), withoutResponse: allowNoResponse)
+            .timeout(const Duration(seconds: 5));
+      } catch (e) {
+        throw Exception('BLE write failed: $e');
+      }
     }
   }
 
