@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tiptap_tour/application/providers/chat_providers.dart';
 import 'package:tiptap_tour/application/providers/database_provider.dart';
+import 'package:tiptap_tour/application/providers/p2p_providers.dart';
 import 'package:tiptap_tour/core/utils/currency_formatter.dart';
 import 'package:tiptap_tour/core/utils/hlc.dart';
 import 'package:tiptap_tour/domain/enums/split_type.dart';
@@ -93,6 +94,43 @@ class AddExpenseNotifier extends StateNotifier<AsyncValue<void>> {
         splitCompanions,
       );
 
+      final syncEngine = _ref.read(syncEngineProvider);
+      await syncEngine.recordChange(
+        tableName: 'expenses',
+        recordId: expenseId,
+        operation: 'insert',
+        data: {
+          'id': expenseId,
+          'tripId': tripId,
+          'paidBy': paidBy,
+          'title': title,
+          'amount': amount,
+          'currency': currency,
+          'category': category,
+          'splitType': splitType.name,
+          'notes': notes,
+          'expenseDate': now,
+          'createdAt': now,
+          'updatedAt': now,
+          'hlcTimestamp': hlc,
+        },
+      );
+
+      for (final split in splitCompanions) {
+        await syncEngine.recordChange(
+          tableName: 'expense_splits',
+          recordId: split.id.value,
+          operation: 'insert',
+          data: {
+            'id': split.id.value,
+            'expenseId': expenseId,
+            'userId': split.userId.value,
+            'amount': split.amount.value,
+            'hlcTimestamp': hlc,
+          },
+        );
+      }
+
       final formatted = CurrencyFormatter.format(amount, currency: currency);
       _ref.read(sendMessageProvider.notifier).sendSystemMessage(
             tripId: tripId,
@@ -149,6 +187,24 @@ class SettleUpNotifier extends StateNotifier<AsyncValue<void>> {
           notes: Value(notes),
           hlcTimestamp: Value(hlc),
         ),
+      );
+
+      final syncEngine = _ref.read(syncEngineProvider);
+      await syncEngine.recordChange(
+        tableName: 'settlements',
+        recordId: settlementId,
+        operation: 'insert',
+        data: {
+          'id': settlementId,
+          'tripId': tripId,
+          'payerId': payerId,
+          'payeeId': payeeId,
+          'amount': amount,
+          'currency': currency,
+          'settledAt': now,
+          'notes': notes,
+          'hlcTimestamp': hlc,
+        },
       );
 
       final formatted = CurrencyFormatter.format(amount, currency: currency);

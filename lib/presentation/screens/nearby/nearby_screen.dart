@@ -3,7 +3,11 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:tiptap_tour/application/providers/p2p_providers.dart';
+import 'package:tiptap_tour/application/providers/trip_providers.dart';
+import 'package:tiptap_tour/application/providers/user_providers.dart';
+import 'package:tiptap_tour/domain/entities/p2p_peer.dart';
 import 'package:tiptap_tour/infrastructure/p2p/p2p_diagnostics.dart';
 import 'package:tiptap_tour/presentation/theme/app_animations.dart';
 import 'package:tiptap_tour/presentation/theme/app_colors.dart';
@@ -158,6 +162,7 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
                   return PeerCard(
                     peer: peer,
                     isSyncing: controllerState.syncingWith == peer.deviceId,
+                    onAddToTrip: () => _showAddToTripSheet(peer),
                     onSync: () => ref
                         .read(p2pControllerProvider.notifier)
                         .syncWithPeer(peer.deviceId),
@@ -216,6 +221,168 @@ class _NearbyScreenState extends ConsumerState<NearbyScreen>
         ],
       ),
     );
+  }
+
+  void _showAddToTripSheet(P2PPeer peer) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final tripsAsync = ref.watch(tripsProvider);
+
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant
+                            .withAlpha(60),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Add ${peer.displayName} to Trip',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  tripsAsync.when(
+                    data: (trips) {
+                      if (trips.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Center(
+                            child: Text(
+                              'No trips yet. Create a trip first!',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.of(context).size.height * 0.4,
+                        ),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: trips.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final trip = trips[index];
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor:
+                                    AppColors.primary.withAlpha(25),
+                                child: const Icon(
+                                  Icons.luggage_rounded,
+                                  color: AppColors.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              title: Text(
+                                trip.name,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600),
+                              ),
+                              subtitle: trip.description != null &&
+                                      trip.description!.isNotEmpty
+                                  ? Text(
+                                      trip.description!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    )
+                                  : null,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: BorderSide(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .outlineVariant
+                                      .withAlpha(60),
+                                ),
+                              ),
+                              onTap: () async {
+                                Navigator.of(sheetContext).pop();
+                                await _addPeerToTrip(peer, trip.id);
+                              },
+                            );
+                          },
+                        ),
+                      );
+                    },
+                    loading: () => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (e, _) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: Text('Error loading trips: $e')),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _addPeerToTrip(P2PPeer peer, String tripId) async {
+    try {
+      await ref
+          .read(addPeerToTripProvider.notifier)
+          .addPeerToTrip(peer: peer, tripId: tripId);
+
+      if (!mounted) return;
+
+      ref.invalidate(usersByTripProvider(tripId));
+      ref.invalidate(tripMembersProvider(tripId));
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${peer.displayName} added and synced'),
+          action: SnackBarAction(
+            label: 'Go to Trip',
+            onPressed: () => context.go('/trip/$tripId'),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to add: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Widget _buildTransportToggles(P2PControllerState controllerState) {

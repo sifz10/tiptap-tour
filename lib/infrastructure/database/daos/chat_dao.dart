@@ -30,6 +30,9 @@ class ChatDao extends DatabaseAccessor<AppDatabase> with _$ChatDaoMixin {
   Future<void> insertMessage(MessagesCompanion message) =>
       into(messages).insert(message);
 
+  Future<void> upsertMessage(MessagesCompanion message) =>
+      into(messages).insertOnConflictUpdate(message);
+
   Future<void> softDeleteMessage(String id, String hlcTimestamp) =>
       (update(messages)..where((m) => m.id.equals(id))).write(
         MessagesCompanion(

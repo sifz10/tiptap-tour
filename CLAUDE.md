@@ -25,6 +25,7 @@ Core user flows already implemented:
 - Partial participation per expense: users can be excluded from a single expense even if they belong to the trip overall.
 - Balance calculation and settlement recording.
 - In-trip chat persisted locally and synced over P2P.
+- Add connected P2P peers to existing trips from the Nearby screen.
 - Summary analytics screen.
 - Settings for theme and currency.
 
@@ -67,6 +68,14 @@ Phase 4 polish that already landed:
 - Onboarding screen redesigned with premium glassmorphism: gradient background, decorative orbs, logo image from `assets/logo/logo.png`, gradient title text, frosted-glass input card with backdrop blur, gradient button.
 - Nearby radar redesigned with premium `_RadarPainter`: 4 concentric guide rings, diagonal cross-hairs, arc-segment sweep trail (30 segments), gradient sweep line with tip dot, 2 clean pulse rings, outer rim glow, multi-layer center dot with highlight.
 - Logo asset path added to `pubspec.yaml` (`assets/logo/`).
+- Fixed "Unknown" display name bug: `createUser()` now saves `displayName` to Hive alongside `userId`, so P2P transport reads the real name instead of the default 'Unknown'.
+- Fixed "Bad state: Missing encryption key" error: `EncryptedTransport` now normalizes composite peer IDs (strips `@ip:port` suffix) before key lookups, so Wi-Fi peers with `userId@ip:port` format match the raw `userId` stored by `keyAnnounce`.
+- Fixed BLE writeCharacteristic timeout: BLE writes now prefer `withoutResponse: true` when the characteristic supports it, with a 5-second per-write timeout and proper error wrapping instead of hanging for 15 seconds.
+- Added "Add to Trip" flow: connected peers on the Nearby screen have a group-add icon button that opens a trip selection bottom sheet. Selecting a trip upserts the peer as a user and adds them as a trip member, with a snackbar offering "Go to Trip" navigation.
+- Sync queue wiring: `CreateTripNotifier` and `AddPeerToTripNotifier` now record changes (trips, users, trip_members) to the sync queue via `SyncEngine.recordChange()`. Previously only chat messages were queued, so trips and members never synced.
+- Auto-sync on add: `AddPeerToTripNotifier` triggers `syncWithPeer()` after adding a peer to a trip, so the trip, members, and user data reach the peer's device immediately.
+- Provider invalidation: the Nearby screen invalidates `usersByTripProvider` and `tripMembersProvider` after adding a peer, so the Members tab refreshes without requiring navigation away and back.
+- Custom launcher icon: `flutter_launcher_icons` generates Android and iOS app icons from `assets/logo/logo.png`, replacing the default Flutter icon.
 
 ## Project Structure
 
@@ -133,6 +142,8 @@ High-value providers:
 - `syncEngineProvider` — sync engine built on the active transport.
 - `p2pControllerProvider` — start/stop discovery, connect/disconnect, sync, toggle Wi-Fi/BLE.
 - `p2pDiagnosticsProvider` — aggregated diagnostics (direct/mesh/encrypted peer counts, route info).
+- `addPeerToTripProvider` — upserts a connected P2P peer as a user, adds them as a trip member, records all changes to the sync queue, and auto-syncs with the peer.
+- `createTripProvider` — creates a trip with the creator as admin, records trip and membership to the sync queue.
 
 Current P2P provider wiring:
 - `p2pServiceProvider` now returns `MeshCompositeTransport`.
@@ -162,6 +173,8 @@ Key notes:
 - `Expenses` uses `splitType` as the enum name string.
 - `Settlements.notes` is nullable.
 - Adding DAO methods on existing tables usually does not require code generation.
+- `UserDao.upsertUser()` uses `insertOnConflictUpdate` for sync-safe peer user creation.
+- `TripDao.addMember()` uses `insertOnConflictUpdate` to avoid duplicate key errors when re-adding existing members.
 
 ## Offline Networking Overview
 
@@ -214,8 +227,14 @@ BLE design:
 - MTU negotiation: default 20 bytes, preferred 512 bytes.
 - Default duty cycle: scan 10s on / 20s pause, `lowPower` scan mode, `ADVERTISE_MODE_LOW_POWER`.
 
+BLE write resilience:
+- Chunked writes prefer `withoutResponse: true` when the characteristic supports it, avoiding ACK-based timeouts.
+- Each write has a 5-second timeout; failures throw a wrapped `Exception` instead of hanging.
+- Connection failures reset state to `disconnected` (or `connected` if other peers are still active) instead of permanently locking to `error`.
+
 Practical note:
 - This code compiles and analyzes, but it still needs real-device validation across iOS and Android. BLE simulator coverage is not enough.
+- BLE discovered peers show "BLE Device" before connection because BLE scanning cannot read the app-level display name. The real name is exchanged during the handshake after connection.
 
 ### Composite Transport
 
@@ -287,6 +306,7 @@ Phase 6 encryption is implemented at code level in `lib/infrastructure/p2p/crypt
 - Only `syncRequest`, `syncResponse`, and `chatMessage` types are encrypted. All other types (discovery, handshake, heartbeat, routeAnnounce, keyAnnounce, etc.) pass through unencrypted.
 - On peer connection, `keyAnnounce` is broadcast automatically. Shared secrets are cached per peer.
 - If a peer's key is unknown when sending, the transport re-announces its own key and throws `StateError`.
+- `EncryptedTransport` normalizes peer IDs via `_normalizeId()` which strips `@ip:port` suffixes from Wi-Fi composite IDs. This ensures key lookups match the raw `userId` stored by `keyAnnounce` messages.
 
 Important limitations:
 - There is not yet a user-facing trust/fingerprint verification UI.
@@ -353,6 +373,8 @@ assets/
 
 All asset folders are registered in `pubspec.yaml` under `flutter: assets:`.
 
+The logo is also used as the launcher icon for both platforms via `flutter_launcher_icons` (configured in `pubspec.yaml`). Run `dart run flutter_launcher_icons` to regenerate icons after changing the logo.
+
 ## UI Patterns
 
 Use these patterns consistently:
@@ -374,7 +396,9 @@ Top-level screens already polished:
 - Settings
 
 Nearby screen specifics:
-- It is the control surface for discovery and peer connections.
+- It is the control surface for discovery, peer connections, and adding peers to trips.
+- Connected peers show three action buttons: Add to Trip (group_add icon), Sync, and Disconnect.
+- "Add to Trip" opens a bottom sheet listing all trips; tapping a trip upserts the peer as a user, adds them as a member, records all data to the sync queue, and auto-syncs so the trip appears on the peer's device. A snackbar with "Go to Trip" navigates to the trip detail (where Chat tab is available). After adding, `usersByTripProvider` and `tripMembersProvider` are invalidated so the Members tab shows the new member immediately.
 - It now includes Wi-Fi and Bluetooth toggle chips backed by `p2pControllerProvider`.
 - It includes a Network Status panel for Phase 7 field testing: direct peers, mesh peers, encrypted peers, route hop count, next hop, and transport state.
 - Radar uses a custom `_RadarPainter` with arc-segment sweep trail, gradient sweep line, pulse rings, and multi-layer center dot. The painter takes `progress`, `isActive`, `pulseValue`, `color`, and `brightness`.
@@ -416,6 +440,11 @@ Important router note:
 - Android BLE requires runtime permission requests (BLUETOOTH_SCAN, BLUETOOTH_CONNECT, BLUETOOTH_ADVERTISE) before any BLE operation. These are requested automatically in `P2PController.startDiscovery()` via `permission_handler`.
 - `CompositeTransport.startDiscovery()` wraps each transport start in try/catch so one failing transport doesn't block the other.
 - The `INTERNET` permission must be in the main `AndroidManifest.xml`, not just the debug manifest, for TCP/UDP sockets to work on real devices.
+- Wi-Fi transport creates composite peer IDs in `userId@ip:port` format. Any layer that stores or looks up data by peer ID must normalize to raw `userId` first (see `EncryptedTransport._normalizeId()`).
+- Hive settings must store `displayName` during onboarding, not just `userId`. The P2P provider reads it with a default of 'Unknown'.
+- BLE characteristic writes should prefer `withoutResponse: true` when supported. Using `withoutResponse: false` requires an ACK from the peripheral and can timeout on real devices.
+- Any provider that creates or modifies syncable data (trips, users, trip_members, expenses, settlements, messages) must call `SyncEngine.recordChange()` to add the change to the sync queue. Without this, the data stays local and never syncs to peers. Currently chat messages, trips, users, and trip members are wired; expenses and settlements still need sync queue wiring.
+- After modifying data that other providers depend on, invalidate the relevant `FutureProvider.family` instances (e.g. `ref.invalidate(usersByTripProvider(tripId))`) so the UI refreshes.
 
 ## App Name and Branding
 
@@ -432,4 +461,9 @@ If you are continuing this work:
 - Encryption is implemented at code level for chat/sync payloads, but trust UI and real-device validation are still pending.
 - The app name is "Tip Tap Tour" (not "Tiptap Tour") — this was changed across all surfaces.
 - The onboarding and radar UI have been polished to premium quality — do not regress them to simpler designs.
-- The most valuable next step is real-device mesh + encryption testing, then battery/background hardening.
+- Connected peers can now be added to trips from the Nearby screen — this creates the peer as a user in the database, adds them as a trip member, records everything to the sync queue, and auto-syncs so the trip appears on the peer's device.
+- `displayName` is persisted to Hive during onboarding; P2P transport reads it from there. Users who onboarded before this fix may need to re-onboard or have a migration applied.
+- BLE writes use `withoutResponse: true` when possible; the old `withoutResponse: false` caused 15-second timeouts on real devices.
+- Sync queue wiring is partially done: chat messages, trips, users, and trip members record to sync queue. Expenses and settlements still need sync queue wiring added to their providers.
+- The app launcher icon uses the logo from `assets/logo/logo.png` on both Android and iOS, generated via `flutter_launcher_icons`.
+- The most valuable next step is real-device mesh + encryption testing, then battery/background hardening, then wiring sync queue for expenses and settlements.

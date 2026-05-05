@@ -50,7 +50,15 @@ class SendMessageNotifier extends StateNotifier<AsyncValue<void>> {
 
       await _db.chatDao.insertMessage(companion);
 
-      _relayViaP2P(tripId, messageId, userId, content, 'text', now, hlc);
+      _relayViaP2P(
+        tripId: tripId,
+        messageId: messageId,
+        senderId: userId,
+        messageType: 'text',
+        sentAt: now,
+        hlc: hlc,
+        content: content,
+      );
 
       final syncEngine = _ref.read(syncEngineProvider);
       await syncEngine.recordChange(
@@ -102,6 +110,16 @@ class SendMessageNotifier extends StateNotifier<AsyncValue<void>> {
       );
 
       await _db.chatDao.insertMessage(companion);
+
+      _relayViaP2P(
+        tripId: tripId,
+        messageId: messageId,
+        senderId: userId,
+        messageType: 'image',
+        sentAt: now,
+        hlc: hlc,
+        imagePath: imagePath,
+      );
 
       final syncEngine = _ref.read(syncEngineProvider);
       await syncEngine.recordChange(
@@ -170,15 +188,16 @@ class SendMessageNotifier extends StateNotifier<AsyncValue<void>> {
     } catch (_) {}
   }
 
-  void _relayViaP2P(
-    String tripId,
-    String messageId,
-    String senderId,
-    String content,
-    String messageType,
-    int sentAt,
-    String hlc,
-  ) {
+  void _relayViaP2P({
+    required String tripId,
+    required String messageId,
+    required String senderId,
+    required String messageType,
+    required int sentAt,
+    required String hlc,
+    String? content,
+    String? imagePath,
+  }) {
     try {
       final p2pService = _ref.read(p2pServiceProvider);
       final chatMsg = P2PMessage.chat(
@@ -189,6 +208,7 @@ class SendMessageNotifier extends StateNotifier<AsyncValue<void>> {
           'senderId': senderId,
           'content': content,
           'messageType': messageType,
+          'imagePath': imagePath,
           'sentAt': sentAt,
           'hlcTimestamp': hlc,
         },
@@ -230,17 +250,23 @@ final deleteMessageProvider =
 final chatP2PListenerProvider = Provider.family<void, String>((ref, tripId) {
   final p2pService = ref.watch(p2pServiceProvider);
   final db = ref.watch(databaseProvider);
+  final settingsBox = Hive.box('settings');
+  final localUserId =
+      settingsBox.get('userId', defaultValue: 'unknown') as String;
 
-  final subscription = p2pService.incomingMessages.listen((message) async {
+  final subscription = p2pService.incomingMessages.listen((message) {
     if (message.type != P2PMessageType.chatMessage) return;
 
     final payload = message.payload;
     if (payload['tripId'] != tripId) return;
 
+    final senderId = payload['senderId'] as String?;
+    if (senderId == localUserId) return;
+
     final companion = MessagesCompanion(
       id: Value(payload['id'] as String),
       tripId: Value(payload['tripId'] as String),
-      senderId: Value(payload['senderId'] as String),
+      senderId: Value(senderId ?? ''),
       content: Value(payload['content'] as String?),
       messageType: Value(payload['messageType'] as String? ?? 'text'),
       imagePath: Value(payload['imagePath'] as String?),
@@ -248,9 +274,7 @@ final chatP2PListenerProvider = Provider.family<void, String>((ref, tripId) {
       hlcTimestamp: Value(payload['hlcTimestamp'] as String),
     );
 
-    try {
-      await db.chatDao.insertMessage(companion);
-    } catch (_) {}
+    db.chatDao.upsertMessage(companion).catchError((_) {});
   });
 
   ref.onDispose(() => subscription.cancel());
